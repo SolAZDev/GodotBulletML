@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3 uid="uid://c3khe84jjvvgk"]
+
+[ext_resource type="Script" path="res://addons/bulletml/nodes/GBML_Emitter.gd" id="1_ekw82"]
+
+[node name="Node2D" type="Node2D"]
+script = ExtResource("1_ekw82")
+bml_file = "res://addons/bulletml/samples/[Original]_dokkaan.xml"
