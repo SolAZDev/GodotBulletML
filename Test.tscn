@@ -4,4 +4,4 @@
 
 [node name="Node2D" type="Node2D"]
 script = ExtResource("1_ekw82")
-bml_file = "res://addons/bulletml/samples/[Original]_dokkaan.xml"
+bml_file = "res://addons/bulletml/samples/[Progear]_round_1_boss_grow_bullets.xml"

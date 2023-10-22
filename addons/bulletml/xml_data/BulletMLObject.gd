@@ -1,6 +1,6 @@
-class_name BMLBulletML
+class_name BulletMLObject
 
 var action:Array[BulletMLAction]
 var bullet:Array[BMLBullet]
-var fire:Array[BMLFire]
+var fire:Array[BulletMLFire]
  

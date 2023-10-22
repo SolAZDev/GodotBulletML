@@ -1,4 +1,4 @@
-class_name BMLBaseType
+class_name BMLBaseType extends RefCounted
 var label: String
 var ref: String
 var parent: BMLBaseType

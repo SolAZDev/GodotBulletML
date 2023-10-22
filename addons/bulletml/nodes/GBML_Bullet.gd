@@ -1,4 +1,4 @@
-class_name BulletMLBullet extends Node
+class_name GBML_Bullet extends Node
 var bullet_data: BMLBullet
 var velocity: Vector2 = Vector2.ZERO
 var diection: float = 0

@@ -1,17 +1,21 @@
 class_name BulletMLAction extends BMLBaseType
-var actions:Array[BulletMLAction]
-var repeat:int 
-var wait: float
-var speed: float
-var diection: float
+var type:BMLBaseType.ENodeName
+var actions: Array[BulletMLAction] 
+
+## Used for Repeats, Waits, Speed
+var ammount:int 
+var term: int
+var direction: float
+var direction_type: BMLBaseType.EDirectionType
 var velocity: Vector2
-var previous_direction: float
-var previous_speed: float
+var fire: BulletMLFire
 var params:Array
-var pc: int
-var finished:bool  
+
+var frames_passed: int
+var finished:bool = false
 
 func vanish():
 	if parent!=null: parent.vanish()
-	pc=-1
+	frames_passed=-1
 	finished=true
+
