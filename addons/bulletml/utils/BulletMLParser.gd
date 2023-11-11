@@ -32,9 +32,9 @@ static func ListChildren(node: XMLNode, parent: XMLNode = null):
 
 
 static func ParseAction(
-	node: XMLNode, bml: BulletMLObject, refable: bool = false, parent_action: BulletMLAction = null
-) -> BulletMLAction:
-	var action = BulletMLAction.new()
+	node: XMLNode, bml: BulletMLObject, refable: bool = false, parent_action: BMLAction = null
+) -> BMLAction:
+	var action = BMLAction.new()
 	var name = (
 		node.attributes.get("label") if node.attributes.has("label") else str(bml.fire.size())
 	)
@@ -61,7 +61,7 @@ static func ParseAction(
 					var dir = TryGetChildNode(child, BMLBaseType.ENodeName.direction)
 					if dir != null:
 						var type = TryGetAttribute(dir, "type")
-						action.direction_type = (
+						action.dir_type = (
 							BMLBaseType.EDirectionType[type]
 							if type != null
 							else BMLBaseType.EDirectionType.absolute
@@ -93,7 +93,7 @@ static func ParseAction(
 		if refable:
 			# Reset and Return Reference
 			bml.action.append(action)
-			action = BulletMLAction.new()
+			action = BMLAction.new()
 			action.ref = name
 			action.type = BMLBaseType.ENodeName.actionRef
 	return action
@@ -111,7 +111,7 @@ static func ParseFire(node: XMLNode, bml: BulletMLObject) -> BulletMLFire:
 		var dir = TryGetChildNode(node, BMLBaseType.ENodeName.direction)
 		if dir != null:
 			var type = TryGetAttribute(dir, "type")
-			fire.direction_type = (
+			fire.dir_type = (
 				BMLBaseType.EDirectionType[type]
 				if type != null
 				else BMLBaseType.EDirectionType.absolute
@@ -150,7 +150,8 @@ static func ParseBullet(node: XMLNode, bml: BulletMLObject) -> BMLBullet:
 		if lifetime!=null: bullet.lifetime = lifetime
 		var action = TryGetChildNode(node, BMLBaseType.ENodeName.action)
 		if action != null:
-			bullet.action = ParseAction(action, bml, true)
+			# Bullets should contain their own actions as they can be executed in their own time
+			bullet.action = ParseAction(action, bml, false)
 		bml.bullet.append(bullet)
 		var ref_name = bullet.label
 		# Reset and Return Reference

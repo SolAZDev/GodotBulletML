@@ -38,16 +38,23 @@ enum EDirectionType{
 
 ## Different types of bullet patterns
 enum EPatternType{
+	## Y or Z Axis
 	vertical,
+	## X Axis
 	horizontal,
 	none
 }
 
-## Theese are used for tasks during runtime
+## These are used for tasks during runtime
 enum ERunStatus{
+	## To Run
+	NotStarted, 
+	## Run Afnd Continue
 	Continue, 
-	End, 
-	Stop 
+	## Wait til task is complete.
+	WaitForMe, 
+	## Skip, Next can Continue
+	Finished, 
 }
 # endregion
 
