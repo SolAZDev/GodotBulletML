@@ -1,6 +1,7 @@
-class_name BulletMLFire extends BMLBaseType
+class_name BMLFire extends BMLBaseType
 var direction: float
 var dir_type: BMLBaseType.EDirectionType
 var speed: float
 var bullet: BMLBullet
-var action: BMLAction
+# According to BulletML Spec, Fires don't have actions
+# var action: BMLAction

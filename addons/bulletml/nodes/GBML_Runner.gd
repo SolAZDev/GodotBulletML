@@ -5,19 +5,23 @@ var bullets: Array[GBML_BulletTypeEntry]
 @export var emitters: Array[GBML_Emitter]
 ## This is a muliplier that is applied to movement.
 @export_range(0.01, 10) var space_scale = 1
+## This is used in the equations, but this value is global per-session. 
+var Rank = 1
 
 func _init():
 	if GBML_Runner.instance != null: queue_free()
 	else: GBML_Runner.instance = self
+	### Set your rank values here
 
 func _process(delta):
 	BulletProcess(delta)
-	for emitter in emitters: ActionProcess(delta, emitter.actions[0], null)
+	for host in emitters: ActionProcess(delta, host.actions[0], null)
 
 
 func BulletProcess(delta: float):
 	for bulletSet in bullets:
 		for bullet in bulletSet.bullets:
+			if bullet.process_mode == PROCESS_MODE_DISABLED: continue
 			var currentPosition:Vector2 = Vector2.ZERO
 			if bullet.parent.Use3D:
 				if bullet.parent.UseXZ: currentPosition = Vector2(bullet.global_position.x, bullet.global_position.z)
@@ -33,12 +37,11 @@ func BulletProcess(delta: float):
 				else: bullet.global_position = Vector3(currentPosition.x, currentPosition.y, bullet.global_position.z)
 			else: bullet.global_position = currentPosition
 
-			# TODO: Call Physics Server.
 			BulletCollissionCheck(bullet)
-			
-
-			if bullet.action != null: ExecuteActionList(delta, bullet.action, bullet)
-			pass
+			if bullet.bullet_data.action != null: ExecuteActionList(delta, bullet.bullet_data.action, bullet)
+				
+			bullet.lifetime-=delta
+			if bullet.lifetime<=0: ToggleBullet(bullet, false)
 
 func ActionProcess(delta: float, action:BMLAction, bullet: GBML_Bullet = null) -> BMLBaseType.ERunStatus:
 	if action.status == BMLBaseType.ERunStatus.Finished: return BMLBaseType.ERunStatus.Finished
@@ -65,12 +68,12 @@ func ActionProcess(delta: float, action:BMLAction, bullet: GBML_Bullet = null) -
 		BMLBaseType.ENodeName.changeDirection:
 			var dirAlteration = 0 
 			match action.dir_type:
-				BMLBaseType.EDirectionType.aim:		 dirAlteration = (action.direction+bullet.GetTargetAim()) - bullet.direction
+				BMLBaseType.EDirectionType.aim:		 dirAlteration = (action.direction+GetObjectAim(bullet, bullet.terget, bullet.parent.Use3D, bullet.parent.UseXZ)) - bullet.direction
 				BMLBaseType.EDirectionType.sequence: dirAlteration = action.direction
 				BMLBaseType.EDirectionType.absolute: dirAlteration = action.direction - bullet.direction
 				BMLBaseType.EDirectionType.relative: dirAlteration = action.direction
 				_: dirAlteration = action.direction
-			bullet.diection += dirAlteration
+			bullet.direction += dirAlteration
 			action.status = BMLBaseType.ERunStatus.Finished if action.frames_passed>=action.term else BMLBaseType.ERunStatus.Continue
 			# action.status = BMLBaseType.ERunStatus.Finished
 		BMLBaseType.ENodeName.changeSpeed: 
@@ -82,7 +85,7 @@ func ActionProcess(delta: float, action:BMLAction, bullet: GBML_Bullet = null) -
 			bullet.bullet_data += speedAlteration
 			action.status = BMLBaseType.ERunStatus.Finished if action.frames_passed>=action.term else BMLBaseType.ERunStatus.Continue
 			# action.status = BMLBaseType.ERunStatus.Finished
-		BMLBaseType.ENodeName.fire: pass # TODO
+		BMLBaseType.ENodeName.fire: FireProcess(action, action.fire, bullet)
 		BMLBaseType.ENodeName.repeat:
 			if action.term >= action.ammount: return BMLBaseType.ERunStatus.Finished
 			else:
@@ -99,6 +102,10 @@ func ActionProcess(delta: float, action:BMLAction, bullet: GBML_Bullet = null) -
 	if action.parent is BMLAction: (action.parent as BMLAction).action_in_process+=1
 	return action.status
 
+
+
+
+
 func ExecuteActionList(delta:float, actionParent: BMLAction, bullet:GBML_Bullet):
 	for action in actionParent.actions:
 		var status = ActionProcess(delta, action, bullet)
@@ -110,8 +117,9 @@ func EraseBulletFromList(bulletList: GBML_BulletTypeEntry, bullet:GBML_Bullet):
 		if bulletList.bullets.size()<=0: bullets.erase(bulletList)
 	bullet.queue_free()
 
-func SpawnBullet(bullet: BMLBullet, parent: GBML_Emitter) -> Node:
-	var bulletsFound = parent.bullet_list.filter(func(be:GBML_BulletEntry): return be.label.to_lower()==bullet.label.to_lower())
+func SpawnBullet(bullet: BMLBullet, parent: GBML_Emitter) -> GBML_Bullet:
+	var list_label = parent.name+"_"
+	var bulletsFound = parent.bullet_list.filter(func(be:GBML_BulletEntry): return be.label.to_lower()==list_label+bullet.label.to_lower())
 	var bulletEntry = bulletsFound[0] if bulletsFound.size()>0 else parent.bullet_list[0]
 	# Check if the bullet entry exists
 	var entriesFound = bullets.filter(func(be: GBML_BulletTypeEntry):return be.label.to_lower() == bulletEntry.label.to_lower())
@@ -157,3 +165,64 @@ func ToggleBullet(bullet:GBML_Bullet, toggle:bool = true) -> void:
 	if toggle: bullet.show()
 	else: bullet.hide()
 	bullet.set_process(toggle)
+
+func GetEmitterActiveTarget(emitter: GBML_Emitter) -> Node:
+	var target = null
+	if emitter.Targets.size()>0: target = emitter.Targets[emitter.ActiveTarget]
+	return target
+
+func GetObjectAim(from: Node, to:Node, Use3D:bool=false, UseXZ:bool=false) -> float:
+	var angle = 0
+	if Use3D:
+		var pos = from.global_position
+		var tar = (to as Node3D).global_position
+		if UseXZ: angle = Vector2(pos.x, pos.z).angle_to_point(Vector2(tar.x, tar.z))
+		else: angle = Vector2(pos.x, pos.y).angle_to_point(Vector2(tar.x, tar.y))
+	else: angle = from.global_position.angle_to_point((to as Node2D).global_position)
+	return angle
+
+func FireProcess(action:BMLAction, fire:BMLFire, bullet_parent: GBML_Bullet) -> BMLBaseType.ERunStatus: 
+	var status = BMLBaseType.ERunStatus.Continue
+	# Find the Fire in the List
+	var host = action.host if action.host != null else fire.host
+	var fire_label = fire.label if fire.label!=null else fire.ref
+	if host == null: 
+		print("ERROR: Host NOT found!!")
+		return BMLBaseType.ERunStatus.Finished
+	
+	var fires_found = host.bml_data.fire.filter(func(f:BMLFire): return f.label.to_lower() == fire_label.to_lower())
+	if fires_found.size()>0:
+		var main_fire: BMLFire = fires_found[0]
+		var bullet_label = main_fire.bullet.label if main_fire.bullet.label!=null else main_fire.bullet.ref
+		var bullets_found = host.bml_data.bullet.filter(func(bul: BMLBullet): return bul.label.to_lower() == bullet_label.to_lower())
+		if bullets_found.size()>0:
+			# Now actually fire the bullet.
+			var bullet_node = SpawnBullet(bullets_found[0], host)
+			# Reset Bullet
+			bullet_node.speed_modifier = 1
+			bullet_node.velocity = Vector2.ZERO
+			bullet_node.bullet_data = bullets_found[0]
+			bullet_node.bullet_data.speed = main_fire.speed
+			bullet_node.target = GetEmitterActiveTarget(host)
+			bullet_node.lifetime = bullets_found[0].lifetime
+			if host.Use3D: bullet_node.global_position = Vector3(host.x, host.y, host.z)
+			else: bullet_node.global_position = Vector2(host.x, host.y)
+			var final_direction = 0
+
+			match main_fire.dir_type:
+				BMLBaseType.EDirectionType.absolute: final_direction = main_fire.direction
+				BMLBaseType.EDirectionType.aim: final_direction = GetObjectAim(host, bullet_node.target, host.Use3D, host.UseXZ)
+				BMLBaseType.EDirectionType.sequence: final_direction += main_fire.direction * action.term
+				_: #Includes Relative and Null
+					var parent = bullet_parent if bullet_parent!=null else host
+					var parent_angle = 0
+					if host.Use3D:
+						if host.UseXZ: 	parent_angle = (parent as Node3D).global_rotation_degrees.y * PI/180
+						else: 			parent_angle = (parent as Node3D).global_rotation_degrees.z * PI/180
+					else: 				parent_angle = (parent as Node2D).global_rotation_degrees
+					final_direction = parent_angle + main_fire.direction
+			
+			bullet_node.direction = final_direction
+			ToggleBullet(bullet_node, true)
+			status = BMLBaseType.ERunStatus.Finished
+	return status;

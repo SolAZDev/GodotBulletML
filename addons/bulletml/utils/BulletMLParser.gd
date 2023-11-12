@@ -1,18 +1,18 @@
 class_name BulletMLParser extends RefCounted
 
 
-static func ParseBML(file: String) -> BulletMLObject:
+static func ParseBML(file: String, host: GBML_Emitter) -> BulletMLObject:
 	var document: XMLDocument = XML.parse_file(file)
 	var data: XMLNode = document.root
 	var bml: BulletMLObject = BulletMLObject.new()
 	for child in data.children:
 		match BMLBaseType.ENodeName[child.name]:
 			BMLBaseType.ENodeName.action:
-				bml.action.append(ParseAction(child, bml))
+				bml.action.append(ParseAction(child, bml, host))
 			BMLBaseType.ENodeName.fire:
-				bml.fire.append(ParseFire(child, bml))
+				bml.fire.append(ParseFire(child, bml, host))
 			BMLBaseType.ENodeName.bullet:
-				ParseBullet(child, bml)
+				ParseBullet(child, bml, host)
 	return bml
 
 
@@ -32,7 +32,7 @@ static func ListChildren(node: XMLNode, parent: XMLNode = null):
 
 
 static func ParseAction(
-	node: XMLNode, bml: BulletMLObject, refable: bool = false, parent_action: BMLAction = null
+	node: XMLNode, bml: BulletMLObject, host:GBML_Emitter, refable: bool = false, parent_action: BMLAction = null
 ) -> BMLAction:
 	var action = BMLAction.new()
 	var name = (
@@ -40,6 +40,7 @@ static func ParseAction(
 	)
 	if BMLBaseType.ENodeName[node.name] == BMLBaseType.ENodeName.actionRef:
 		action.ref = name
+		action.host = host
 		action.type = BMLBaseType.ENodeName.actionRef
 	else:
 		for child in node.children:
@@ -50,7 +51,7 @@ static func ParseAction(
 					if times!=null: action.ammount = ParseEquation(times)
 				BMLBaseType.ENodeName.fire, BMLBaseType.ENodeName.fireRef:
 					action.type = BMLBaseType.ENodeName.fire
-					action.fire = ParseFire(child, bml)
+					action.fire = ParseFire(child, bml, host)
 				BMLBaseType.ENodeName.changeSpeed:
 					action.type = BMLBaseType.ENodeName.changeSpeed
 					action.ammount = TryGetChildValue(child, BMLBaseType.ENodeName.speed)
@@ -86,7 +87,7 @@ static func ParseAction(
 					action.type = BMLBaseType.ENodeName.vanish
 				BMLBaseType.ENodeName.action, BMLBaseType.ENodeName.actionRef:
 					action.type = BMLBaseType.ENodeName.action
-					ParseAction(child, bml, false, action)
+					ParseAction(child, bml, host, false, action)
 		action.label = name
 		if parent_action != null:
 			parent_action.actions.append(action)
@@ -99,8 +100,9 @@ static func ParseAction(
 	return action
 
 
-static func ParseFire(node: XMLNode, bml: BulletMLObject) -> BulletMLFire:
-	var fire = BulletMLFire.new()
+static func ParseFire(node: XMLNode, bml: BulletMLObject, host:GBML_Emitter) -> BMLFire:
+	var fire = BMLFire.new()
+	fire.host = host
 	if BMLBaseType.ENodeName[node.name] == BMLBaseType.ENodeName.fireRef:
 		fire.ref = node.attributes.get("label")
 	else:
@@ -121,20 +123,21 @@ static func ParseFire(node: XMLNode, bml: BulletMLObject) -> BulletMLFire:
 		if speed !=null: fire.speed = speed
 		var bullet = TryGetChildNode(node, BMLBaseType.ENodeName.bullet)
 		if bullet != null:
-			fire.bullet = ParseBullet(bullet, bml)
-		var action = TryGetChildNode(node, BMLBaseType.ENodeName.action)
-		if action != null:
-			fire.action = ParseAction(action, bml, true)
+			fire.bullet = ParseBullet(bullet, bml, host)
+		# Fires don't have actions. At least, according to BulletML spec.
+		# var action = TryGetChildNode(node, BMLBaseType.ENodeName.action)
+		# if action != null:
+		# 	fire.action = ParseAction(action, bml, host, false)
 
 		bml.fire.append(fire)
 		# Reset and Return Reference
-		fire = BulletMLFire.new()
+		fire = BMLFire.new()
 		fire.ref = name
 	return fire
 
 
 ## Parses a bullet & bulletRef node. it will add the bullet to the Root's bullet collection, but returns a reference to it.
-static func ParseBullet(node: XMLNode, bml: BulletMLObject) -> BMLBullet:
+static func ParseBullet(node: XMLNode, bml: BulletMLObject, host:GBML_Emitter) -> BMLBullet:
 	var bullet: BMLBullet = BMLBullet.new()
 	if BMLBaseType.ENodeName[node.name] == BMLBaseType.ENodeName.bulletRef:
 		bullet.ref = node.attributes.get("label")
@@ -151,7 +154,7 @@ static func ParseBullet(node: XMLNode, bml: BulletMLObject) -> BMLBullet:
 		var action = TryGetChildNode(node, BMLBaseType.ENodeName.action)
 		if action != null:
 			# Bullets should contain their own actions as they can be executed in their own time
-			bullet.action = ParseAction(action, bml, false)
+			bullet.action = ParseAction(action, bml, host, false)
 		bml.bullet.append(bullet)
 		var ref_name = bullet.label
 		# Reset and Return Reference
@@ -194,7 +197,8 @@ static func TryGetChildNode(node: XMLNode, type: BMLBaseType.ENodeName) -> XMLNo
 static func ParseEquation(equation: String) -> float:
 	var exp = Expression.new()
 	var result = 0
-	var finalString = equation.replace("$rank", "1").replace("$rand", str(randf_range(0,1)))
+	var rank = GBML_Runner.instance.Rank if GBML_Runner.instance != null else 1
+	var finalString = equation.replace("$rank", str(rank)).replace("$rand", str(randf_range(0,1)))
 	var err = exp.parse(finalString)
 	if err == OK: result = exp.execute()
 	return result

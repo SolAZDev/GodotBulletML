@@ -10,7 +10,7 @@ var direction: float
 var dir_type: BMLBaseType.EDirectionType
 var alt_dir_type: BMLBaseType.EDirectionType
 var velocity: Vector2
-var fire: BulletMLFire
+var fire: BMLFire
 var params:Array
 
 var frames_passed: float

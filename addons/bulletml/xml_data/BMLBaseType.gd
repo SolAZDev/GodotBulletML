@@ -2,6 +2,8 @@ class_name BMLBaseType extends RefCounted
 var label: String
 var ref: String
 var parent: BMLBaseType
+var host: GBML_Emitter
+
 
 # region Enums
 ## These are the different type of nodes that can exist in a bulletML file
@@ -57,5 +59,3 @@ enum ERunStatus{
 	Finished, 
 }
 # endregion
-
-func vanish(): pass

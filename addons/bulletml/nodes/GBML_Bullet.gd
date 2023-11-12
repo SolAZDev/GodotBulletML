@@ -9,17 +9,12 @@ var listParent: GBML_BulletTypeEntry
 var parent: GBML_Emitter
 var velocity: Vector2 = Vector2.ZERO
 var speed_modifier: float = 1
-var diection: float = 0
-var vanished:bool   = false
-var finished:bool   = false
+var direction: float = 0
 var target:Node     = null
 var rank:float      = 0
 var tags:Array[String] = []
-var action:BMLAction
 var damage: int     = 1
 var lifetime:float  = 10
-
-func replace_action(old, new)->void: pass
 
 func GetTargetAim() -> float: 
 	var angle = 0

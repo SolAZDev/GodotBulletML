@@ -16,8 +16,12 @@ class_name GBML_Emitter extends Node
 ## The Parsed BML Data
 var bml_data: BulletMLObject
 
+@export_category("Aiming Settings")
+@export var ActiveTarget:int = 0
+@export var Targets:Array[Node]
+
 var bml:BulletMLObject
 func _ready():
-	var bml_data = BulletMLParser.ParseBML(bml_file)
+	var bml_data = BulletMLParser.ParseBML(bml_file, self)
 	if bml_data != null:
 		GBML_Runner.instance.emitter.push(self)
