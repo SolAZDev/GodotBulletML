@@ -6,7 +6,6 @@ class_name GBML_Emitter extends Node
 ## Bullet Dictionary, to look up what bullets to use
 @export var bullet_list: Array[GBML_BulletEntry]
 
-@export_category("Bullet Space Settings")
 ## Enable 3D
 @export var Use3D: bool = false
 
@@ -23,5 +22,8 @@ var bml_data: BulletMLObject
 var bml:BulletMLObject
 func _ready():
 	var bml_data = BulletMLParser.ParseBML(bml_file, self)
-	if bml_data != null:
-		GBML_Runner.instance.emitter.push(self)
+	if bml_data != null: AddToRunner()
+
+func AddToRunner()->void: GBML_Runner.instance.emitter.push(self)
+
+func RemoveFromRunner()->void: GBML_Runner.instance.DeleteEvertythingFromEmitter(self)

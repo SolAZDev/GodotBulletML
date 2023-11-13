@@ -17,8 +17,7 @@ func _process(delta):
 	BulletProcess(delta)
 	for host in emitters: ActionProcess(delta, host.actions[0], null)
 
-
-func BulletProcess(delta: float):
+func BulletProcess(delta: float) -> void:
 	for bulletSet in bullets:
 		for bullet in bulletSet.bullets:
 			if bullet.process_mode == PROCESS_MODE_DISABLED: continue
@@ -102,20 +101,67 @@ func ActionProcess(delta: float, action:BMLAction, bullet: GBML_Bullet = null) -
 	if action.parent is BMLAction: (action.parent as BMLAction).action_in_process+=1
 	return action.status
 
+func FireProcess(action:BMLAction, fire:BMLFire, bullet_parent: GBML_Bullet) -> BMLBaseType.ERunStatus: 
+	var status = BMLBaseType.ERunStatus.Continue
+	# Find the Fire in the List
+	var host = action.host if action.host != null else fire.host
+	var fire_label = fire.label if fire.label!=null else fire.ref
+	if host == null: 
+		print("ERROR: Host NOT found!!")
+		return BMLBaseType.ERunStatus.Finished
+	
+	var fires_found = host.bml_data.fire.filter(func(f:BMLFire): return f.label.to_lower() == fire_label.to_lower())
+	if fires_found.size()>0:
+		var main_fire: BMLFire = fires_found[0]
+		var bullet_label = main_fire.bullet.label if main_fire.bullet.label!=null else main_fire.bullet.ref
+		var bullets_found = host.bml_data.bullet.filter(func(bul: BMLBullet): return bul.label.to_lower() == bullet_label.to_lower())
+		if bullets_found.size()>0:
+			# Now actually fire the bullet.
+			var bullet_node = SpawnBullet(bullets_found[0], host)
+			# Reset Bullet
+			bullet_node.speed_modifier = 1
+			bullet_node.velocity = Vector2.ZERO
+			bullet_node.bullet_data = bullets_found[0]
+			bullet_node.bullet_data.speed = main_fire.speed
+			bullet_node.target = GetEmitterActiveTarget(host)
+			bullet_node.lifetime = bullets_found[0].lifetime
+			if host.Use3D: bullet_node.global_position = Vector3(host.x, host.y, host.z)
+			else: bullet_node.global_position = Vector2(host.x, host.y)
+			var final_direction = 0
 
-
-
+			match main_fire.dir_type:
+				BMLBaseType.EDirectionType.absolute: final_direction = main_fire.direction
+				BMLBaseType.EDirectionType.aim: final_direction = GetObjectAim(host, bullet_node.target, host.Use3D, host.UseXZ)
+				BMLBaseType.EDirectionType.sequence: final_direction += main_fire.direction * action.term
+				_: #Includes Relative and Null
+					var parent = bullet_parent if bullet_parent!=null else host
+					var parent_angle = 0
+					if host.Use3D:
+						if host.UseXZ: 	parent_angle = (parent as Node3D).global_rotation_degrees.y * PI/180
+						else: 			parent_angle = (parent as Node3D).global_rotation_degrees.z * PI/180
+					else: 				parent_angle = (parent as Node2D).global_rotation_degrees
+					final_direction = parent_angle + main_fire.direction
+			
+			bullet_node.direction = final_direction
+			ToggleBullet(bullet_node, true)
+			status = BMLBaseType.ERunStatus.Finished
+	return status;
 
 func ExecuteActionList(delta:float, actionParent: BMLAction, bullet:GBML_Bullet):
 	for action in actionParent.actions:
 		var status = ActionProcess(delta, action, bullet)
 		if status == BMLBaseType.ERunStatus.WaitForMe: break
 
-func EraseBulletFromList(bulletList: GBML_BulletTypeEntry, bullet:GBML_Bullet):
-	if bulletList != null:
-		bulletList.bullets.erase(bullet)
-		if bulletList.bullets.size()<=0: bullets.erase(bulletList)
-	bullet.queue_free()
+func DeleteEvertythingFromEmitter(emitter: GBML_Emitter)->void:
+	for bulletSet in emitter.bullet_list: 
+		var list_label = emitter.name+"_"+bulletSet.label
+		var active_bullet_entry = bullets.filter(func(bte:GBML_BulletTypeEntry): return bte.label==list_label)
+		if active_bullet_entry.size()<=1: continue
+		for i in range(active_bullet_entry[0].bullets,0, -1):
+			active_bullet_entry[0].bullets[i].queue_free()
+			active_bullet_entry[0].bullets.remove_at(i)
+		bullets.erase(active_bullet_entry)
+	emitters.erase(emitter)
 
 func SpawnBullet(bullet: BMLBullet, parent: GBML_Emitter) -> GBML_Bullet:
 	var list_label = parent.name+"_"
@@ -181,48 +227,3 @@ func GetObjectAim(from: Node, to:Node, Use3D:bool=false, UseXZ:bool=false) -> fl
 	else: angle = from.global_position.angle_to_point((to as Node2D).global_position)
 	return angle
 
-func FireProcess(action:BMLAction, fire:BMLFire, bullet_parent: GBML_Bullet) -> BMLBaseType.ERunStatus: 
-	var status = BMLBaseType.ERunStatus.Continue
-	# Find the Fire in the List
-	var host = action.host if action.host != null else fire.host
-	var fire_label = fire.label if fire.label!=null else fire.ref
-	if host == null: 
-		print("ERROR: Host NOT found!!")
-		return BMLBaseType.ERunStatus.Finished
-	
-	var fires_found = host.bml_data.fire.filter(func(f:BMLFire): return f.label.to_lower() == fire_label.to_lower())
-	if fires_found.size()>0:
-		var main_fire: BMLFire = fires_found[0]
-		var bullet_label = main_fire.bullet.label if main_fire.bullet.label!=null else main_fire.bullet.ref
-		var bullets_found = host.bml_data.bullet.filter(func(bul: BMLBullet): return bul.label.to_lower() == bullet_label.to_lower())
-		if bullets_found.size()>0:
-			# Now actually fire the bullet.
-			var bullet_node = SpawnBullet(bullets_found[0], host)
-			# Reset Bullet
-			bullet_node.speed_modifier = 1
-			bullet_node.velocity = Vector2.ZERO
-			bullet_node.bullet_data = bullets_found[0]
-			bullet_node.bullet_data.speed = main_fire.speed
-			bullet_node.target = GetEmitterActiveTarget(host)
-			bullet_node.lifetime = bullets_found[0].lifetime
-			if host.Use3D: bullet_node.global_position = Vector3(host.x, host.y, host.z)
-			else: bullet_node.global_position = Vector2(host.x, host.y)
-			var final_direction = 0
-
-			match main_fire.dir_type:
-				BMLBaseType.EDirectionType.absolute: final_direction = main_fire.direction
-				BMLBaseType.EDirectionType.aim: final_direction = GetObjectAim(host, bullet_node.target, host.Use3D, host.UseXZ)
-				BMLBaseType.EDirectionType.sequence: final_direction += main_fire.direction * action.term
-				_: #Includes Relative and Null
-					var parent = bullet_parent if bullet_parent!=null else host
-					var parent_angle = 0
-					if host.Use3D:
-						if host.UseXZ: 	parent_angle = (parent as Node3D).global_rotation_degrees.y * PI/180
-						else: 			parent_angle = (parent as Node3D).global_rotation_degrees.z * PI/180
-					else: 				parent_angle = (parent as Node2D).global_rotation_degrees
-					final_direction = parent_angle + main_fire.direction
-			
-			bullet_node.direction = final_direction
-			ToggleBullet(bullet_node, true)
-			status = BMLBaseType.ERunStatus.Finished
-	return status;
