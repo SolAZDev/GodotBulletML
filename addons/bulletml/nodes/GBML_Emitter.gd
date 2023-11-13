@@ -24,6 +24,8 @@ func _ready():
 	var bml_data = BulletMLParser.ParseBML(bml_file, self)
 	if bml_data != null: AddToRunner()
 
+## Add this emitter to the Runner so it can be processed
 func AddToRunner()->void: GBML_Runner.instance.emitter.push(self)
 
+## Remove this emitter for being is processed
 func RemoveFromRunner()->void: GBML_Runner.instance.DeleteEvertythingFromEmitter(self)

@@ -17,6 +17,7 @@ func _process(delta):
 	BulletProcess(delta)
 	for host in emitters: ActionProcess(delta, host.actions[0], null)
 
+## Processes all active bullets. Moves them, Checks for collission and life span, and finally, executes their actions.
 func BulletProcess(delta: float) -> void:
 	for bulletSet in bullets:
 		for bullet in bulletSet.bullets:
@@ -37,11 +38,12 @@ func BulletProcess(delta: float) -> void:
 			else: bullet.global_position = currentPosition
 
 			BulletCollissionCheck(bullet)
-			if bullet.bullet_data.action != null: ExecuteActionList(delta, bullet.bullet_data.action, bullet)
-				
 			bullet.lifetime-=delta
 			if bullet.lifetime<=0: ToggleBullet(bullet, false)
+			
+			if bullet.bullet_data.action != null: ExecuteActionList(delta, bullet.bullet_data.action, bullet)
 
+## Exectutes an action, used for iteration. To execute a list, look at ExecuteActionList
 func ActionProcess(delta: float, action:BMLAction, bullet: GBML_Bullet = null) -> BMLBaseType.ERunStatus:
 	if action.status == BMLBaseType.ERunStatus.Finished: return BMLBaseType.ERunStatus.Finished
 	match action.type:
@@ -58,12 +60,9 @@ func ActionProcess(delta: float, action:BMLAction, bullet: GBML_Bullet = null) -
 			bullet.velocity += acceleration
 			action.frames_passed += 1
 			action.status = BMLBaseType.ERunStatus.Finished if action.frames_passed>=action.term else BMLBaseType.ERunStatus.Continue
-			# bullet.speed_modifier = 0
-		BMLBaseType.ENodeName.action: # Premature Attempt
-			for act in action.actions:
-				var result = ActionProcess(delta, act, bullet)
-				match result:
-					BMLBaseType.ERunStatus.Continue: pass
+		BMLBaseType.ENodeName.action: # Premature Attempt, this is what ExecuteActionList is for though.
+			ExecuteActionList(delta, action, bullet)
+			action.status = BMLBaseType.ERunStatus.Finished
 		BMLBaseType.ENodeName.changeDirection:
 			var dirAlteration = 0 
 			match action.dir_type:
@@ -74,7 +73,6 @@ func ActionProcess(delta: float, action:BMLAction, bullet: GBML_Bullet = null) -
 				_: dirAlteration = action.direction
 			bullet.direction += dirAlteration
 			action.status = BMLBaseType.ERunStatus.Finished if action.frames_passed>=action.term else BMLBaseType.ERunStatus.Continue
-			# action.status = BMLBaseType.ERunStatus.Finished
 		BMLBaseType.ENodeName.changeSpeed: 
 			var speedAlteration = 0
 			match action.dir_type:
@@ -83,12 +81,13 @@ func ActionProcess(delta: float, action:BMLAction, bullet: GBML_Bullet = null) -
 				_: speedAlteration = (action.ammount - bullet.bullet_data.speed) / (action.term - action.frames_passed)
 			bullet.bullet_data += speedAlteration
 			action.status = BMLBaseType.ERunStatus.Finished if action.frames_passed>=action.term else BMLBaseType.ERunStatus.Continue
-			# action.status = BMLBaseType.ERunStatus.Finished
-		BMLBaseType.ENodeName.fire: FireProcess(action, action.fire, bullet)
+		BMLBaseType.ENodeName.fire: action.status = FireProcess(action, action.fire, bullet)
 		BMLBaseType.ENodeName.repeat:
 			if action.term >= action.ammount: return BMLBaseType.ERunStatus.Finished
 			else:
 				action.term +=1
+				# Force Reset; needs testing.
+				for child_action in action.actions: child_action.status = BMLBaseType.ERunStatus.NotStarted
 				ExecuteActionList(delta, action, bullet)
 				action.status = BMLBaseType.ERunStatus.WaitForMe
 		BMLBaseType.ENodeName.wait:
@@ -101,6 +100,7 @@ func ActionProcess(delta: float, action:BMLAction, bullet: GBML_Bullet = null) -
 	if action.parent is BMLAction: (action.parent as BMLAction).action_in_process+=1
 	return action.status
 
+## Processes a Fire action, will spawn a bullet from the emitter and enable it for processing
 func FireProcess(action:BMLAction, fire:BMLFire, bullet_parent: GBML_Bullet) -> BMLBaseType.ERunStatus: 
 	var status = BMLBaseType.ERunStatus.Continue
 	# Find the Fire in the List
@@ -147,11 +147,13 @@ func FireProcess(action:BMLAction, fire:BMLFire, bullet_parent: GBML_Bullet) -> 
 			status = BMLBaseType.ERunStatus.Finished
 	return status;
 
+## Execute a list of actions until it has to wait for one to finish
 func ExecuteActionList(delta:float, actionParent: BMLAction, bullet:GBML_Bullet):
 	for action in actionParent.actions:
 		var status = ActionProcess(delta, action, bullet)
 		if status == BMLBaseType.ERunStatus.WaitForMe: break
 
+## Destroys every bullet from an emitter, and removes the emitter from the list to stop it from being processed 
 func DeleteEvertythingFromEmitter(emitter: GBML_Emitter)->void:
 	for bulletSet in emitter.bullet_list: 
 		var list_label = emitter.name+"_"+bulletSet.label
@@ -163,6 +165,7 @@ func DeleteEvertythingFromEmitter(emitter: GBML_Emitter)->void:
 		bullets.erase(active_bullet_entry)
 	emitters.erase(emitter)
 
+## Spawns a bullet, either pooled or makes a new entry in the bullet list with its emitter to pool future bullets
 func SpawnBullet(bullet: BMLBullet, parent: GBML_Emitter) -> GBML_Bullet:
 	var list_label = parent.name+"_"
 	var bulletsFound = parent.bullet_list.filter(func(be:GBML_BulletEntry): return be.label.to_lower()==list_label+bullet.label.to_lower())
@@ -187,6 +190,7 @@ func SpawnBullet(bullet: BMLBullet, parent: GBML_Emitter) -> GBML_Bullet:
 		bullets.append(entry)
 		return spawn
 
+## Checks if a bullet has a colission
 func BulletCollissionCheck(bullet:GBML_Bullet) -> void:
 	var result: Array[Dictionary] = []
 	if bullet.parent.Use3D:
@@ -207,16 +211,19 @@ func BulletCollissionCheck(bullet:GBML_Bullet) -> void:
 			other_node.collider.emit_signal('bullet_hit', bullet)
 		ToggleBullet(bullet, false)
 
+## Enables or Disables a Bullet from being processed and 
 func ToggleBullet(bullet:GBML_Bullet, toggle:bool = true) -> void:
 	if toggle: bullet.show()
 	else: bullet.hide()
 	bullet.set_process(toggle)
 
+## Gets the Emitter's Active target
 func GetEmitterActiveTarget(emitter: GBML_Emitter) -> Node:
 	var target = null
 	if emitter.Targets.size()>0: target = emitter.Targets[emitter.ActiveTarget]
 	return target
 
+## Get the Aim Angle from an object to a target
 func GetObjectAim(from: Node, to:Node, Use3D:bool=false, UseXZ:bool=false) -> float:
 	var angle = 0
 	if Use3D:

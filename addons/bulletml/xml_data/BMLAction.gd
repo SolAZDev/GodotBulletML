@@ -5,7 +5,9 @@ var action_in_process: int = -1
 
 ## Used for Repeats, Waits, Speed
 var ammount:int 
+## Used for iterations
 var term: int
+## Direction in Degrees
 var direction: float 
 var dir_type: BMLBaseType.EDirectionType
 var alt_dir_type: BMLBaseType.EDirectionType
