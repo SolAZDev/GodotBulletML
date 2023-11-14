@@ -1,4 +1,4 @@
-class_name BulletMLParser extends RefCounted
+class_name BulletMLParser
 
 ## Parses a BulletML File, needs the res://url to the BulletML file, and will return a BulletMLObject
 static func ParseBML(file: String, host: GBML_Emitter) -> BulletMLObject:
@@ -52,6 +52,10 @@ static func ParseAction(
 					action.type = BMLBaseType.ENodeName.repeat
 					var times = TryGetChildValue(child, BMLBaseType.ENodeName.times)
 					if times!=null: action.ammount = ParseEquation(times)
+					var actions =  TryGetChildNode(node, BMLBaseType.ENodeName.action)
+					if actions!=null:
+						for act in actions.children:
+							action.actions = ParseAction(act, bml, host, false, action)
 				BMLBaseType.ENodeName.fire, BMLBaseType.ENodeName.fireRef:
 					action.type = BMLBaseType.ENodeName.fire
 					action.fire = ParseFire(child, bml, host)
@@ -91,6 +95,10 @@ static func ParseAction(
 				BMLBaseType.ENodeName.action, BMLBaseType.ENodeName.actionRef:
 					action.type = BMLBaseType.ENodeName.action
 					ParseAction(child, bml, host, false, action)
+					var actions =  TryGetChildNode(node, BMLBaseType.ENodeName.action)
+					if actions!=null:
+						for act in actions.children:
+							action.actions = ParseAction(act, bml, host, false, action)
 		action.label = name
 		if parent_action != null:
 			parent_action.actions.append(action)

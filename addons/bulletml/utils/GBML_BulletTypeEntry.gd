@@ -1,3 +1,3 @@
-class_name GBML_BulletTypeEntry extends RefCounted
+class_name GBML_BulletTypeEntry
 var label: String
 var bullets: Array[GBML_Bullet]

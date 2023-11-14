@@ -15,7 +15,7 @@ func _init():
 
 func _process(delta):
 	BulletProcess(delta)
-	for host in emitters: ActionProcess(delta, host.actions[0], null)
+	for host in emitters: ActionProcess(delta, host.bml_data.action[0], null)
 
 ## Processes all active bullets. Moves them, Checks for collission and life span, and finally, executes their actions.
 func BulletProcess(delta: float) -> void:

@@ -1,4 +1,4 @@
-class_name BulletMLObject extends RefCounted
+class_name BulletMLObject
 var IsHorizontal: bool = false
 var action:Array[BMLAction]
 var fire:Array[BMLFire]
