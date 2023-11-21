@@ -1,5 +1,9 @@
 class_name GBML_Emitter extends Node
 @export_category("Core Settings")
+## Start once the node is Ready
+@export var auto_start:bool = false
+## Ammount of seconds to wait before it's added to the Runne
+@export var start_delay:float = 1
 ## BulletML File to Run
 @export var bml_file: String
 
@@ -19,13 +23,21 @@ var bml_data: BulletMLObject
 @export var ActiveTarget:int = 0
 @export var Targets:Array[Node]
 
-var bml:BulletMLObject
+signal OnEmitterAdded(emitter:GBML_Emitter)
+signal OnEmitterRemoved(emitter:GBML_Emitter)
+
 func _ready():
-	var bml_data = BulletMLParser.ParseBML(bml_file, self)
-	if bml_data != null: AddToRunner()
+	bml_data = BulletMLParser.ParseBML(bml_file, self)
+	if auto_start == true: AddToRunner()
 
 ## Add this emitter to the Runner so it can be processed
-func AddToRunner()->void: GBML_Runner.instance.emitter.push(self)
+func AddToRunner()->void:
+	await get_tree().create_timer(start_delay).timeout
+	if bml_data!=null: 
+		GBML_Runner.instance.emitters.append(self)
+		OnEmitterAdded.emit(self)
 
 ## Remove this emitter for being is processed
-func RemoveFromRunner()->void: GBML_Runner.instance.DeleteEvertythingFromEmitter(self)
+func RemoveFromRunner()->void:
+	GBML_Runner.instance.DeleteEvertythingFromEmitter(self)
+	OnEmitterRemoved.emit(self)

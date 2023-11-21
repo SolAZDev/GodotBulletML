@@ -6,4 +6,4 @@ var action: BMLAction
 ## Optional Damage that a bullet can give to the player
 var damage: int = 1
 ## Lifetime of the Bullet. Default is 60 seconds.
-var lifetime: float = 3600
+var lifetime: float = 10

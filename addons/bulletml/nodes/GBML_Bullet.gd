@@ -8,9 +8,9 @@ class_name GBML_Bullet extends Node
 
 var bullet_data: BMLBullet
 var listParent: GBML_BulletTypeEntry
-var parent: GBML_Emitter
+var host: GBML_Emitter
 var velocity: Vector2 = Vector2.ZERO
-var speed_modifier: float = 1
+var speed: float
 var direction: float = 0
 var target:Node     = null
 var rank:float      = 0

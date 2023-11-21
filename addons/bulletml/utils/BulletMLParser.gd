@@ -35,73 +35,91 @@ static func ListChildren(node: XMLNode, parent: XMLNode = null):
 
 ## Parses a action & actionRef node. it will add the action to the Root's action collection, but returns a reference to it.
 static func ParseAction(
-	node: XMLNode, bml: BulletMLObject, host:GBML_Emitter, refable: bool = false, parent_action: BMLAction = null
+	node: XMLNode, bml: BulletMLObject, host:GBML_Emitter, refable: bool = false, parent_bullet: BMLBullet = null
 ) -> BMLAction:
 	var action = BMLAction.new()
 	var name = (
 		node.attributes.get("label") if node.attributes.has("label") else str(bml.fire.size())
 	)
+	action.host = host
 	if BMLBaseType.ENodeName[node.name] == BMLBaseType.ENodeName.actionRef:
 		action.ref = name
-		action.host = host
 		action.type = BMLBaseType.ENodeName.actionRef
 	else:
+		action.label = name
+		# TODO: Reorganize as Child of Node in question
+		# 		The Current Method is currently overwriting the current action
+		# 		Thus never really adding the actions, except the last one
 		for child in node.children:
+			var childAction = BMLAction.new()
+			childAction.host = host
+			# Used to understand the action hirearchy
+			childAction.label = child.name
 			match BMLBaseType.ENodeName[child.name]:
-				BMLBaseType.ENodeName.repeat:
-					action.type = BMLBaseType.ENodeName.repeat
+				# This one i tricky, but is a good example or replicating what needs to be done here
+				# The action itself is a repeat, but
+				BMLBaseType.ENodeName.repeat:  
+					# TODO: Rewrite as a Nested Action
+					childAction.type = BMLBaseType.ENodeName.repeat
 					var times = TryGetChildValue(child, BMLBaseType.ENodeName.times)
-					if times!=null: action.ammount = ParseEquation(times)
-					var actions =  TryGetChildNode(node, BMLBaseType.ENodeName.action)
-					if actions!=null:
-						for act in actions.children:
-							action.actions = ParseAction(act, bml, host, false, action)
+					if times!=null: childAction.ammount = ParseEquation(times)
+					var actions =  TryGetChildNode(child, BMLBaseType.ENodeName.action) 
+					# TODO: actions.child[0] IS action
+					var repeatedActions = ParseAction(actions, bml, host, false, parent_bullet)
+					childAction.actions = repeatedActions.actions
+					# childAction.actions.append(ParseAction(actions, bml, host, false, action))
+					# if actions!=null:
+					# 	for act in actions.children:
+					# 		if BMLBaseType.ENodeName[act.name]==BMLBaseType.ENodeName.fire or BMLBaseType.ENodeName[act.name]==BMLBaseType.ENodeName.fireRef:
+					# 			action.fire = ParseFire(act, bml, host)
+					# 		else:
+					# 			action.actions.append(ParseAction(act, bml, host, false, action))
 				BMLBaseType.ENodeName.fire, BMLBaseType.ENodeName.fireRef:
-					action.type = BMLBaseType.ENodeName.fire
-					action.fire = ParseFire(child, bml, host)
+					childAction.type = BMLBaseType.ENodeName.fire
+					childAction.fire = ParseFire(child, bml, host)
 				BMLBaseType.ENodeName.changeSpeed:
-					action.type = BMLBaseType.ENodeName.changeSpeed
-					action.ammount = TryGetChildValue(child, BMLBaseType.ENodeName.speed)
+					childAction.type = BMLBaseType.ENodeName.changeSpeed
+					childAction.ammount = TryGetChildValue(child, BMLBaseType.ENodeName.speed)
 					var term = TryGetChildValue(child, BMLBaseType.ENodeName.term)
-					if term!=null: action.term = ParseEquation(term)
+					if term!=null: childAction.term = ParseEquation(term)
 				BMLBaseType.ENodeName.changeDirection:
-					action.type = BMLBaseType.ENodeName.changeDirection
+					childAction.type = BMLBaseType.ENodeName.changeDirection
 					var dir = TryGetChildNode(child, BMLBaseType.ENodeName.direction)
 					if dir != null:
 						var type = TryGetAttribute(dir, "type")
-						action.dir_type = (
+						childAction.dir_type = (
 							BMLBaseType.EDirectionType[type]
 							if type != null
 							else BMLBaseType.EDirectionType.absolute
 						)
-						action.direction = ParseEquation(dir.content)
-						action.term = ParseEquation(TryGetChildValue(child, BMLBaseType.ENodeName.term))
+						childAction.direction = ParseEquation(dir.content)
+						childAction.term = ParseEquation(TryGetChildValue(child, BMLBaseType.ENodeName.term))
 				BMLBaseType.ENodeName.accel:
-					action.type = BMLBaseType.ENodeName.accel
+					childAction.type = BMLBaseType.ENodeName.accel
 					# I honestly don't understand this bit just yet Isn't this what .direction is for?
 					var dir = Vector2(0,0)
 					var x = TryGetChildValue(child, BMLBaseType.ENodeName.horizontal)
 					if x!=null: dir.x = ParseEquation(x)
 					var y = TryGetChildValue(child, BMLBaseType.ENodeName.vertical)
 					if y!=null: dir.y = ParseEquation(y)
-					action.velocity = dir
+					childAction.velocity = dir
 					var term = TryGetChildValue(child, BMLBaseType.ENodeName.term)
-					if term!=null: action.term = ParseEquation(term)
+					if term!=null: childAction.term = ParseEquation(term)
 				BMLBaseType.ENodeName.wait:
-					action.type = BMLBaseType.ENodeName.wait
-					action.ammount = ParseEquation(node.content)
+					childAction.type = BMLBaseType.ENodeName.wait
+					childAction.ammount = ParseEquation(node.content)
 				BMLBaseType.ENodeName.vanish:
-					action.type = BMLBaseType.ENodeName.vanish
+					childAction.type = BMLBaseType.ENodeName.vanish
 				BMLBaseType.ENodeName.action, BMLBaseType.ENodeName.actionRef:
-					action.type = BMLBaseType.ENodeName.action
-					ParseAction(child, bml, host, false, action)
+					# Strange Workaround
+					childAction.type = BMLBaseType.ENodeName.action
+					# ParseAction(child, bml, host, false, action)
 					var actions =  TryGetChildNode(node, BMLBaseType.ENodeName.action)
 					if actions!=null:
-						for act in actions.children:
-							action.actions = ParseAction(act, bml, host, false, action)
+						for act in actions.children: 
+							childAction.actions.append(ParseAction(act, bml, host, false, parent_bullet))
+			action.actions.append(childAction)
 		action.label = name
-		if parent_action != null:
-			parent_action.actions.append(action)
 		if refable:
 			# Reset and Return Reference
 			bml.action.append(action)
@@ -135,11 +153,10 @@ static func ParseFire(node: XMLNode, bml: BulletMLObject, host:GBML_Emitter) -> 
 		var bullet = TryGetChildNode(node, BMLBaseType.ENodeName.bullet)
 		if bullet != null:
 			fire.bullet = ParseBullet(bullet, bml, host)
-		# Fires don't have actions. At least, according to BulletML spec.
-		# var action = TryGetChildNode(node, BMLBaseType.ENodeName.action)
-		# if action != null:
-		# 	fire.action = ParseAction(action, bml, host, false)
-
+		else: # What if it's a bullet Ref?
+			bullet = TryGetChildNode(node, BMLBaseType.ENodeName.bulletRef)
+			if bullet != null:
+				fire.bullet = ParseBullet(bullet, bml, host)
 		bml.fire.append(fire)
 		# Reset and Return Reference
 		fire = BMLFire.new()
@@ -149,6 +166,7 @@ static func ParseFire(node: XMLNode, bml: BulletMLObject, host:GBML_Emitter) -> 
 ## Parses a bullet & bulletRef node. it will add the bullet to the Root's bullet collection, but returns a reference to it.
 static func ParseBullet(node: XMLNode, bml: BulletMLObject, host:GBML_Emitter) -> BMLBullet:
 	var bullet: BMLBullet = BMLBullet.new()
+	bullet.host = host
 	if BMLBaseType.ENodeName[node.name] == BMLBaseType.ENodeName.bulletRef:
 		bullet.ref = node.attributes.get("label")
 	else:  #Make a new entry and return ref.
