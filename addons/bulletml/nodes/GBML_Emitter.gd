@@ -35,7 +35,7 @@ signal OnEmitterRemoved(emitter:GBML_Emitter)
 @onready var spawnedBulletTo:Node = get_node_or_null(spawnedBulletToPath)
 
 func _ready():
-	bml_data = BulletMLParser.ParseBML(bml_file, self)
+	bml_data = BulletMLParser.ParseBML(bml_file, self,true)
 	if auto_start == true: AddToRunner()
 
 
@@ -43,7 +43,7 @@ func _ready():
 
 func reload():
 	RemoveFromRunner()
-	bml_data = BulletMLParser.ParseBML(bml_file, self)
+	bml_data = BulletMLParser.ParseBML(bml_file, self,true)
 	if auto_start == true: AddToRunner()
 
 

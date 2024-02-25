@@ -1,8 +1,21 @@
 class_name BMLBaseType extends Resource
 var label: String
-var ref: String
+var ref: String=''
 var parent: BMLBaseType
 var host: GBML_Emitter
+var params:Array
+
+func get_params()->Array:
+	var aParams:Array = []
+	# get params and append any more from the host
+	for i in range(max(host.params.size(),params.size())):
+		if i < params.size():
+			aParams.append(params[i])
+		else:
+			if i < host.params.size():
+				aParams.append(host.params[i])
+ 
+	return aParams
 
 
 # region Enums

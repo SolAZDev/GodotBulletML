@@ -8,9 +8,9 @@
 				<fireRef label="shot" />
 				<wait>4</wait>
 				<fireRef label="shot" />
-				<wait>4</wait>
+				<wait>10</wait>
 				<fireRef label="shot" />
-				<wait>4</wait>
+				<wait>30</wait>
 			</action>
 		</repeat>
 	</action>

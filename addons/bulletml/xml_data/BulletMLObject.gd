@@ -4,4 +4,5 @@ var action:Array[BMLAction]
 var fire:Array[BMLFire]
 var bullet:Array[BMLBullet]
 var params:Array = []
+var data_xml:XMLNode = null
  

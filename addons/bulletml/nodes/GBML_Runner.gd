@@ -102,6 +102,7 @@ func ActionProcess(delta: float, action:BMLAction, bullet: GBML_Bullet = null) -
 			action.status = FireProcess(action, action.fire, bullet)
 		BMLBaseType.ENodeName.repeat:
 			if action.term >= action.ammount: 
+				action.status = BMLBaseType.ERunStatus.Finished
 				#if action.parent is BMLAction: (action.parent as BMLAction).action_in_process+=1
 				return BMLBaseType.ERunStatus.Finished
 			else: 
@@ -181,6 +182,7 @@ func FireProcess(action:BMLAction, fire:BMLFire, bullet_parent: GBML_Bullet) -> 
 
 ## Execute a list of actions until it has to wait for one to finish
 func ExecuteActionList(delta:float, actionParent: BMLAction, bullet:GBML_Bullet):
+	if actionParent.status == BMLBaseType.ERunStatus.Finished: return BMLBaseType.ERunStatus.Finished
 	var status = BMLBaseType.ERunStatus.Continue
 	while status != BMLBaseType.ERunStatus.WaitForMe:
 		var action = actionParent.next_action()
@@ -192,13 +194,12 @@ func ExecuteActionList(delta:float, actionParent: BMLAction, bullet:GBML_Bullet)
 		status = ActionProcess(delta, action, bullet)
 		if status == BMLBaseType.ERunStatus.WaitSleep: 
 			actionParent.move_back()
-			break
-		if status == BMLBaseType.ERunStatus.WaitForMe:  
-			break
+			break		
 		if status == BMLBaseType.ERunStatus.Finished: 
 			actionParent.action_in_process+=1
 		if actionParent.action_in_process >= actionParent.actions.size(): 
 			status= BMLBaseType.ERunStatus.Finished
+			actionParent.status = BMLBaseType.ERunStatus.Finished
 			break
 		
 	return status
