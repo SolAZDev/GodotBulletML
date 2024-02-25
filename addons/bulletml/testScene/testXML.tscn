@@ -1,0 +1,71 @@
+[gd_scene load_steps=9 format=3 uid="uid://cvp253eplcmil"]
+
+[ext_resource type="Script" path="res://addons/bulletml/testScene/testXML.gd" id="1_oa2ow"]
+[ext_resource type="Script" path="res://addons/bulletml/testScene/VBoxContainer.gd" id="2_m6o4w"]
+[ext_resource type="Script" path="res://addons/bulletml/nodes/GBML_Emitter.gd" id="3_hfxb1"]
+[ext_resource type="PackedScene" uid="uid://b4bluk2vnx7q7" path="res://basic_the_bullet.tscn" id="4_ekj1v"]
+[ext_resource type="Script" path="res://addons/bulletml/utils/GBML_BulletEntry.gd" id="5_ssuk7"]
+[ext_resource type="Texture2D" uid="uid://bl5kk7g1gdjh6" path="res://icon.svg" id="6_ayyjl"]
+
+[sub_resource type="Resource" id="Resource_0uvxw"]
+script = ExtResource("5_ssuk7")
+label = "0"
+bullet = ExtResource("4_ekj1v")
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_pv1q3"]
+size = Vector2(32, 32)
+
+[node name="TestXml" type="Node2D"]
+script = ExtResource("1_oa2ow")
+
+[node name="Panel" type="Panel" parent="."]
+offset_right = 288.0
+offset_bottom = 643.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("2_m6o4w")
+
+[node name="XmlFiles" type="ItemList" parent="Panel/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+item_count = 1
+item_0/text = ""
+
+[node name="emitter" type="Node2D" parent="." node_paths=PackedStringArray("Targets")]
+position = Vector2(657, 322)
+script = ExtResource("3_hfxb1")
+auto_start = true
+bml_file = "res://addons/bulletml/samples/1111.xml"
+bullet_list = Array[ExtResource("5_ssuk7")]([SubResource("Resource_0uvxw")])
+spawnedBulletToPath = NodePath("../bulletPlace")
+Targets = [NodePath("../Target")]
+params = [1.0, 1.0, 1.0, 1.0, 1.0]
+
+[node name="Sprite2D" type="Sprite2D" parent="emitter"]
+texture = ExtResource("6_ayyjl")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(575, 324)
+
+[node name="Target" type="Area2D" parent="."]
+position = Vector2(1100, 108)
+
+[node name="Sprite2D" type="Sprite2D" parent="Target"]
+scale = Vector2(0.25, 0.25)
+texture = ExtResource("6_ayyjl")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Target"]
+position = Vector2(-1, 0)
+shape = SubResource("RectangleShape2D_pv1q3")
+
+[node name="bulletPlace" type="Node2D" parent="."]
+
+[connection signal="chane_xml" from="Panel/VBoxContainer" to="." method="_on_v_box_container_chane_xml"]
+[connection signal="item_activated" from="Panel/VBoxContainer/XmlFiles" to="Panel/VBoxContainer" method="_on_xml_files_item_activated"]
+[connection signal="item_clicked" from="Panel/VBoxContainer/XmlFiles" to="Panel/VBoxContainer" method="_on_xml_files_item_clicked"]

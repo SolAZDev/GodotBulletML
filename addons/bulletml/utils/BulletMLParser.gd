@@ -6,6 +6,7 @@ static func ParseBML(file: String, host: GBML_Emitter) -> BulletMLObject:
 	var data: XMLNode = document.root
 	var bml: BulletMLObject = BulletMLObject.new()
 	var type = TryGetAttribute(data, "type")
+	bml.params = host.params
 	# Check if null or just not horizontal
 	if type != "horizontal" : bml.IsHorizontal=false
 	else: bml.IsHorizontal=true
@@ -17,6 +18,7 @@ static func ParseBML(file: String, host: GBML_Emitter) -> BulletMLObject:
 				bml.fire.append(ParseFire(child, bml, host))
 			BMLBaseType.ENodeName.bullet:
 				bml.bullet.append(ParseBullet(child, bml, host))
+	
 	return bml
 
 ## Lists children of a node. Used for debugging
@@ -62,7 +64,7 @@ static func ParseAction(
 					# TODO: Rewrite as a Nested Action
 					childAction.type = BMLBaseType.ENodeName.repeat
 					var times = TryGetChildValue(child, BMLBaseType.ENodeName.times)
-					if times!=null: childAction.ammount = ParseEquation(times)
+					if times!=null: childAction.ammount = ParseEquation(times,bml.params)
 					var actions =  TryGetChildNode(child, BMLBaseType.ENodeName.action) 
 					# TODO: actions.child[0] IS action
 					var repeatedActions = ParseAction(actions, bml, host, false, parent_bullet)
@@ -81,7 +83,7 @@ static func ParseAction(
 					childAction.type = BMLBaseType.ENodeName.changeSpeed
 					childAction.ammount = TryGetChildValue(child, BMLBaseType.ENodeName.speed)
 					var term = TryGetChildValue(child, BMLBaseType.ENodeName.term)
-					if term!=null: childAction.term = ParseEquation(term)
+					if term!=null: childAction.term = ParseEquation(term,bml.params)
 				BMLBaseType.ENodeName.changeDirection:
 					childAction.type = BMLBaseType.ENodeName.changeDirection
 					var dir = TryGetChildNode(child, BMLBaseType.ENodeName.direction)
@@ -92,22 +94,22 @@ static func ParseAction(
 							if type != null
 							else BMLBaseType.EDirectionType.absolute
 						)
-						childAction.direction = ParseEquation(dir.content)
-						childAction.term = ParseEquation(TryGetChildValue(child, BMLBaseType.ENodeName.term))
+						childAction.direction = ParseEquation(dir.content,bml.params)
+						childAction.term = ParseEquation(TryGetChildValue(child, BMLBaseType.ENodeName.term),bml.params)
 				BMLBaseType.ENodeName.accel:
 					childAction.type = BMLBaseType.ENodeName.accel
 					# I honestly don't understand this bit just yet Isn't this what .direction is for?
 					var dir = Vector2(0,0)
 					var x = TryGetChildValue(child, BMLBaseType.ENodeName.horizontal)
-					if x!=null: dir.x = ParseEquation(x)
+					if x!=null: dir.x = ParseEquation(x,bml.params)
 					var y = TryGetChildValue(child, BMLBaseType.ENodeName.vertical)
-					if y!=null: dir.y = ParseEquation(y)
+					if y!=null: dir.y = ParseEquation(y,bml.params)
 					childAction.velocity = dir
 					var term = TryGetChildValue(child, BMLBaseType.ENodeName.term)
-					if term!=null: childAction.term = ParseEquation(term)
+					if term!=null: childAction.term = ParseEquation(term,bml.params)
 				BMLBaseType.ENodeName.wait:
 					childAction.type = BMLBaseType.ENodeName.wait
-					childAction.ammount = ParseEquation(node.content)
+					childAction.ammount = ParseEquation(child.content,bml.params)
 				BMLBaseType.ENodeName.vanish:
 					childAction.type = BMLBaseType.ENodeName.vanish
 				BMLBaseType.ENodeName.action, BMLBaseType.ENodeName.actionRef:
@@ -147,7 +149,7 @@ static func ParseFire(node: XMLNode, bml: BulletMLObject, host:GBML_Emitter) -> 
 				if type != null
 				else BMLBaseType.EDirectionType.absolute
 			)
-			fire.direction = ParseEquation(dir.content)
+			fire.direction = ParseEquation(dir.content,bml.params)
 		var speed = TryGetChildValue(node, BMLBaseType.ENodeName.speed)
 		if speed !=null: fire.speed = speed
 		var bullet = TryGetChildNode(node, BMLBaseType.ENodeName.bullet)
@@ -222,10 +224,12 @@ static func TryGetChildNode(node: XMLNode, type: BMLBaseType.ENodeName) -> XMLNo
 		return null
 
 ## Parses Equations based on string literals
-static func ParseEquation(equation: String) -> float:
+static func ParseEquation(equation: String,params:Array) -> float:
 	var exp = Expression.new()
 	var result = 0
 	var rank = GBML_Runner.instance.Rank if GBML_Runner.instance != null else 1
+	for x in params.size():
+		equation = equation.replace("$%d" % (x+1), str(params[x]))
 	var finalString = equation.replace("$rank", str(rank)).replace("$rand", str(randf_range(0,1)))
 	# TODO: Parse params 
 	var err = exp.parse(finalString)

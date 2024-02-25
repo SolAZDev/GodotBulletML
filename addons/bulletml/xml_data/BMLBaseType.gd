@@ -1,4 +1,4 @@
-class_name BMLBaseType extends Object
+class_name BMLBaseType extends Resource
 var label: String
 var ref: String
 var parent: BMLBaseType
@@ -51,10 +51,12 @@ enum EPatternType{
 enum ERunStatus{
 	## To Run
 	NotStarted, 
-	## Run Afnd Continue
+	## Run And Continue
 	Continue, 
 	## Wait til task is complete.
-	WaitForMe, 
+	WaitForMe,
+	## Wait til task is complete.
+	WaitSleep,
 	## Skip, Next can Continue
 	Finished, 
 }
