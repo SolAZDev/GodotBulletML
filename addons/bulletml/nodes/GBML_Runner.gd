@@ -3,7 +3,7 @@ class_name GBML_Runner extends Node
 static var instance: GBML_Runner
 var bullets: Array[GBML_BulletTypeEntry]
 @export var emitters: Array[GBML_Emitter]
-## This is a muliplier that is applied to movement.
+## This is a multiplier that is applied to movement.
 @export_range(0.01, 10) var space_scale = 1
 ## This is used in the equations, but this value is global per-session. 
 var Rank = 1
@@ -19,7 +19,7 @@ func _process(delta):
 		for emitter in emitters: 
 			ExecuteActionList(delta, emitter.bml_data.action[0], null)
 
-## Processes all active bullets. Moves them, Checks for collission and life span, and finally, executes their actions.
+## Processes all active bullets. Moves them, Checks for collision and life span, and finally, executes their actions.
 func BulletProcess(delta: float) -> void:
 	for bulletSet in bullets:
 		for bullet in bulletSet.bullets:
@@ -39,15 +39,22 @@ func BulletProcess(delta: float) -> void:
 				else: bullet.global_position = Vector3(currentPosition.x, currentPosition.y, bullet.global_position.z)
 			else: bullet.global_position = currentPosition
 
-			BulletCollissionCheck(bullet)
+			BulletCollisionCheck(bullet)
 			bullet.lifetime-=delta
 			if bullet.lifetime<=0: ToggleBullet(bullet, false)
 			
-			if bullet.bullet_data.action != null: ExecuteActionList(delta, bullet.bullet_data.action, bullet)
+			if bullet.bullet_data.action != null: 
+				#print_debug("Bullet action ",bullet.bullet_data.action)
+				ExecuteActionList(delta, bullet.bullet_data.action, bullet)
 
 ## Exectutes an action, used for iteration. To execute a list, look at ExecuteActionList
 func ActionProcess(delta: float, action:BMLAction, bullet: GBML_Bullet = null) -> BMLBaseType.ERunStatus:
-	if action.status == BMLBaseType.ERunStatus.Finished: return BMLBaseType.ERunStatus.Finished
+	#if bullet==null: return BMLBaseType.ERunStatus.Finished
+	if action==null:
+		assert(action!=null)
+	if action.status == BMLBaseType.ERunStatus.Finished: 
+		#if action.parent is BMLAction: (action.parent as BMLAction).action_in_process+=1
+		return BMLBaseType.ERunStatus.Finished
 	match action.type:
 		BMLBaseType.ENodeName.accel: 
 			var acceleration = Vector2.ZERO
@@ -68,40 +75,55 @@ func ActionProcess(delta: float, action:BMLAction, bullet: GBML_Bullet = null) -
 		BMLBaseType.ENodeName.changeDirection:
 			var dirAlteration = 0 
 			match action.dir_type:
-				BMLBaseType.EDirectionType.aim:		 dirAlteration = (action.direction+GetObjectAim(bullet, bullet.terget, bullet.host.Use3D, bullet.host.UseXZ)) - bullet.direction
+				BMLBaseType.EDirectionType.aim: 
+					if bullet:
+						dirAlteration = (action.direction+GetObjectAim(bullet, bullet.target, bullet.host.Use3D, bullet.host.UseXZ)) - bullet.direction
+					else:
+						dirAlteration = action.direction
 				BMLBaseType.EDirectionType.sequence: dirAlteration = action.direction
-				BMLBaseType.EDirectionType.absolute: dirAlteration = action.direction - bullet.direction
+				BMLBaseType.EDirectionType.absolute: dirAlteration = action.direction - (bullet.direction if bullet else 0) 
 				BMLBaseType.EDirectionType.relative: dirAlteration = action.direction
 				_: dirAlteration = action.direction
-			bullet.direction += dirAlteration
+			if bullet:
+				bullet.direction += dirAlteration
 			action.status = BMLBaseType.ERunStatus.Finished if action.frames_passed>=action.term else BMLBaseType.ERunStatus.Continue
 		BMLBaseType.ENodeName.changeSpeed: 
 			var speedAlteration = 0
 			match action.dir_type:
 				BMLBaseType.EDirectionType.sequence: speedAlteration = bullet.bullet_data.speed
 				BMLBaseType.EDirectionType.relative: speedAlteration = bullet.bullet_data.speed/action.term
-				_: speedAlteration = (action.ammount - bullet.bullet_data.speed) / (action.term - action.frames_passed)
-			bullet.speed += speedAlteration
+				_: 
+					if bullet:
+						speedAlteration = (action.ammount - bullet.bullet_data.speed) / (action.term - action.frames_passed)
+			if bullet:
+				bullet.speed += speedAlteration
 			action.status = BMLBaseType.ERunStatus.Finished if action.frames_passed>=action.term else BMLBaseType.ERunStatus.Continue
 		BMLBaseType.ENodeName.fire: 
 			action.status = FireProcess(action, action.fire, bullet)
 		BMLBaseType.ENodeName.repeat:
-			if action.term >= action.ammount: return BMLBaseType.ERunStatus.Finished
-			else:
-				action.term +=1 
-				# Force Reset; needs testing.
-				for child_action in action.actions: child_action.status = BMLBaseType.ERunStatus.NotStarted
-				ExecuteActionList(delta, action, bullet)
+			if action.term >= action.ammount: 
+				action.status = BMLBaseType.ERunStatus.Finished
+				#if action.parent is BMLAction: (action.parent as BMLAction).action_in_process+=1
+				return BMLBaseType.ERunStatus.Finished
+			else: 
+				var status = ExecuteActionList(delta, action, bullet)
+				if status==BMLBaseType.ERunStatus.Finished:
+					action.term +=1 
+					# Force Reset; needs testing.
+					action.restart()
+					 
 				action.status = BMLBaseType.ERunStatus.WaitForMe
 		BMLBaseType.ENodeName.wait:
-			if action.frames_passed >= action.ammount: action.status = BMLBaseType.ERunStatus.Finished
+			if action.frames_passed >= action.ammount:
+				action.frames_passed=0 
+				action.status = BMLBaseType.ERunStatus.Finished
 			else:
-				action.status = BMLBaseType.ERunStatus.WaitForMe
-				action.frames_passed+=delta
+				action.status = BMLBaseType.ERunStatus.WaitSleep
+				action.frames_passed+=1
 		# BMLBaseType.ENodeName.vanish: EraseBulletFromList(bullet.listParent, bullet)
 		BMLBaseType.ENodeName.vanish: ToggleBullet(bullet, false)
 
-	if action.parent is BMLAction: (action.parent as BMLAction).action_in_process+=1
+	#if action.parent is BMLAction: (action.parent as BMLAction).action_in_process+=1
 	return action.status
 
 ## Processes a Fire action, will spawn a bullet from the emitter and enable it for processing
@@ -126,6 +148,8 @@ func FireProcess(action:BMLAction, fire:BMLFire, bullet_parent: GBML_Bullet) -> 
 			# Reset Bullet
 			bullet_node.velocity = Vector2.ONE
 			bullet_node.bullet_data = bullets_found[0]
+			if bullets_found[0].action:
+				bullet_node.bullet_data.action = bullets_found[0].action.duplicate(true)
 			bullet_node.speed = main_fire.speed if bullets_found[0].speed==null else bullets_found[0].speed
 			bullet_node.target = GetEmitterActiveTarget(host)
 			bullet_node.lifetime = bullets_found[0].lifetime
@@ -158,12 +182,35 @@ func FireProcess(action:BMLAction, fire:BMLFire, bullet_parent: GBML_Bullet) -> 
 
 ## Execute a list of actions until it has to wait for one to finish
 func ExecuteActionList(delta:float, actionParent: BMLAction, bullet:GBML_Bullet):
-	for action in actionParent.actions:
-		var status = ActionProcess(delta, action, bullet)
-		if status == BMLBaseType.ERunStatus.WaitForMe: break
+	if actionParent.status == BMLBaseType.ERunStatus.Finished: return BMLBaseType.ERunStatus.Finished
+	var status = BMLBaseType.ERunStatus.Continue
+	while status != BMLBaseType.ERunStatus.WaitForMe:
+		var action = actionParent.next_action()
+		
+		if action==null:
+			status = BMLBaseType.ERunStatus.Finished
+			break
+		
+		status = ActionProcess(delta, action, bullet)
+		if status == BMLBaseType.ERunStatus.WaitSleep: 
+			actionParent.move_back()
+			break		
+		if status == BMLBaseType.ERunStatus.Finished: 
+			actionParent.action_in_process+=1
+		if actionParent.action_in_process >= actionParent.actions.size(): 
+			status= BMLBaseType.ERunStatus.Finished
+			actionParent.status = BMLBaseType.ERunStatus.Finished
+			break
+		
+	return status
+	# for action in actionParent.actions:
+	# 	var status = ActionProcess(delta, action, bullet)
+	# 	if status==BMLBaseType.ERunStatus.WaitSleep:
+
+	# 	if status == BMLBaseType.ERunStatus.WaitForMe: break
 
 ## Destroys every bullet from an emitter, and removes the emitter from the list to stop it from being processed 
-func DeleteEvertythingFromEmitter(emitter: GBML_Emitter)->void:
+func DeleteEverythingFromEmitter(emitter: GBML_Emitter)->void:
 	for bulletSet in emitter.bullet_list: 
 		var list_label = emitter.name+"_"+bulletSet.label
 		var active_bullet_entry = bullets.filter(func(bte:GBML_BulletTypeEntry): return bte.label==list_label)
@@ -190,13 +237,15 @@ func SpawnBullet(bullet: BMLBullet, host:GBML_Emitter, parent_bullet: GBML_Bulle
 		else: #Spawn Bullet
 			var spawn = bulletEntry.bullet.instantiate()
 			spawn.host = host
-			host.add_child(spawn)
+			if host.spawnedBulletTo==null: host.add_child(spawn)
+			else: host.spawnedBulletTo.add_child(spawn)
 			entriesFound[0].bullets.append(spawn)
 			return spawn
 	else: # Spawn bullet and append to bullet dictionary
 		var spawn = (bulletEntry.bullet.instantiate() as GBML_Bullet)
 		spawn.host = host
-		host.add_child(spawn)
+		if host.spawnedBulletTo==null: host.add_child(spawn)
+		else: host.spawnedBulletTo.add_child(spawn)
 		var entry:GBML_BulletTypeEntry = GBML_BulletTypeEntry.new()
 		entry.label = bulletEntry.label
 		entry.bullets = []
@@ -204,8 +253,8 @@ func SpawnBullet(bullet: BMLBullet, host:GBML_Emitter, parent_bullet: GBML_Bulle
 		bullets.append(entry)
 		return spawn
 
-## Checks if a bullet has a colission
-func BulletCollissionCheck(bullet:GBML_Bullet) -> void:
+## Checks if a bullet has a collision
+func BulletCollisionCheck(bullet:GBML_Bullet) -> void:
 	var result: Array[Dictionary] = []
 	if bullet.host.Use3D:
 		var query := PhysicsShapeQueryParameters3D.new()
@@ -245,6 +294,12 @@ func GetEmitterActiveTarget(emitter: GBML_Emitter) -> Node:
 ## Get the Aim Angle from an object to a target
 func GetObjectAim(from: Node, to:Node, Use3D:bool=false, UseXZ:bool=false) -> float:
 	var angle = 0
+	if to==null:
+		#print_debug()
+		return angle
+	if from==null:
+		return angle	
+	
 	if Use3D:
 		var pos = from.global_position
 		var tar = (to as Node3D).global_position
